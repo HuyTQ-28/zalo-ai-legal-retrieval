@@ -74,7 +74,7 @@ class TFIDFRetriever:
 
 def run_evaluation(
     data_dir: str | Path = None,
-    top_k: int = 100,
+    top_k: int = 50,
     qrels_split: str = "test",
 ) -> dict:
     if data_dir is None:
@@ -95,12 +95,28 @@ def run_evaluation(
     print("Đang truy vấn...")
     results = retriever.retrieve_batch(query_ids, query_texts, top_k=top_k)
 
-    from utils.metrics import evaluate, print_metrics
+    from utils.metrics import calculate_recall_at_k, calculate_mrr_at_k
     ranked = results_to_ranked_lists(results)
 
     k_values = [k for k in [5, 10, 15, 20, 50] if k <= top_k]
-    metrics = evaluate(ranked, qrels, k_values=k_values)
-    print_metrics(metrics, method_name="TF-IDF (ngram 1-2, sublinear_tf)")
+    metrics = {}
+
+    for k in k_values:
+        recall_scores = []
+        mrr_scores = []
+        for qid in query_ids:
+            if qid not in qrels:
+                continue
+            relevant_docs = qrels[qid]
+            retrieved = ranked.get(qid, [])
+            recall_scores.append(calculate_recall_at_k(relevant_docs, retrieved, k))
+            mrr_scores.append(calculate_mrr_at_k(relevant_docs, retrieved, k))
+        metrics[f"recall@{k}"] = float(np.mean(recall_scores)) if recall_scores else 0.0
+        metrics[f"mrr@{k}"] = float(np.mean(mrr_scores)) if mrr_scores else 0.0
+
+    print(f"\n=== TF-IDF (ngram 1-2, sublinear_tf) | top_k={top_k} ===")
+    for k in k_values:
+        print(f"  Recall@{k:<3} = {metrics[f'recall@{k}']:.4f}   MRR@{k:<3} = {metrics[f'mrr@{k}']:.4f}")
 
     return {"method": "tfidf", "top_k": top_k, **metrics}
 

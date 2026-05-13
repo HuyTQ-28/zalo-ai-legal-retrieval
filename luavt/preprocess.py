@@ -21,7 +21,7 @@ def normalize_text(text: str) -> str:
     text = unicodedata.normalize("NFC", text)
     text = text.lower()
     # Giữ lại chữ cái tiếng Việt, số, khoảng trắng
-    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
+    text = re.sub(r"[^\w\s/.-]", " ", text, flags=re.UNICODE)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
