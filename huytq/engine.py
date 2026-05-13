@@ -2,6 +2,7 @@ import os
 import json
 import math
 import pickle
+import urllib.request
 from collections import Counter
 import sys
 from typing import Dict, List, Tuple
@@ -170,32 +171,56 @@ class BM25Plus:
         return [doc_id for doc_id, score in sorted_docs[:top_k]]
 
 
+
+
 def main():
     # 1. Configuration
-    DATASET_DIR = "dataset"
+    BASE_URL = "https://huggingface.co/datasets/GreenNode/zalo-ai-legal-text-retrieval-vn/resolve/main"
     CACHE_DIR = "cache"
     
-    CORPUS_FILE = os.path.join(DATASET_DIR, "corpus.jsonl")
-    QUERIES_FILE = os.path.join(DATASET_DIR, "queries.jsonl")
-    QRELS_FILE = os.path.join(DATASET_DIR, "test.jsonl")
+    # URL trực tiếp từ HuggingFace
+    CORPUS_URL = f"{BASE_URL}/corpus.jsonl"
+    QUERIES_URL = f"{BASE_URL}/queries.jsonl"
+    QRELS_URL = f"{BASE_URL}/qrels/train.jsonl"
+    
+    # Đường dẫn file Cache cục bộ (để không phải tải lại từ web mỗi lần chạy)
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    
+    CORPUS_FILE = os.path.join(CACHE_DIR, "corpus.jsonl")
+    QUERIES_FILE = os.path.join(CACHE_DIR, "queries.jsonl")
+    QRELS_FILE = os.path.join(CACHE_DIR, "train.jsonl")
+    
+    def download_file(url, local_path):
+        if not os.path.exists(local_path):
+            print(f"Downloading {url} to {local_path}...")
+            urllib.request.urlretrieve(url, local_path)
+            
+    download_file(CORPUS_URL, CORPUS_FILE)
+    download_file(QUERIES_URL, QUERIES_FILE)
+    download_file(QRELS_URL, QRELS_FILE)
     
     CORPUS_CACHE = os.path.join(CACHE_DIR, "corpus_cache.pkl")
     QUERIES_CACHE = os.path.join(CACHE_DIR, "queries_cache.pkl")
 
-    K_VALUES = [1, 5, 10, 20]
+    # Tham số đánh giá
+    K_VALUES = [1, 5, 10, 20 , 50, 100]
     MAX_K = max(K_VALUES)
-    
-    os.makedirs(CACHE_DIR, exist_ok=True)
 
-    # 2. Load and Preprocess Data
-    print("Loading & preprocessing data ...")
+    # --- 2. Load và Tiền xử lý dữ liệu ---
+    print("--- Đang tải & xử lý dữ liệu từ HuggingFace ---")
     
-    corpus_tokens = load_corpus(CORPUS_FILE, CORPUS_CACHE)
-    queries_tokens, ground_truths = load_queries_and_qrels(QUERIES_FILE, QRELS_FILE, QUERIES_CACHE)
+    # Tải Corpus
+    corpus_tokens = load_corpus(
+        filepath=CORPUS_FILE, 
+        cache_path=CORPUS_CACHE
+    )
     
-    if not corpus_tokens or not queries_tokens:
-        print("Error: Dataset empty or could not be loaded. Please check your data paths.")
-        return
+    # Tải Queries và Ground Truth (qrels)
+    queries_tokens, ground_truths = load_queries_and_qrels(
+        queries_path=QUERIES_FILE,
+        qrels_path=QRELS_FILE,
+        cache_path=QUERIES_CACHE
+    )
 
     # 3. Initialize BM25+ Engine
     print("Initializing BM25+ engine ...")
@@ -203,7 +228,7 @@ def main():
     print(f"Index built successfully! Vocabulary size: {len(bm25.inverted_index)} terms.")
 
     # 4. Evaluation Loop
-    print(f"Evaluating BM25+ on test queries for K in {K_VALUES} ...")
+    print(f"Evaluating BM25+ on train queries for K in {K_VALUES} ...")
     
     # Dictionary để lưu tổng điểm cho từng thang K
     total_recall = {k: 0.0 for k in K_VALUES}
@@ -221,7 +246,7 @@ def main():
                 total_recall[k] += calculate_recall_at_k(actual_docs, retrieved_docs, k)
                 total_mrr[k] += calculate_mrr_at_k(actual_docs, retrieved_docs, k)
         else:
-            # Trừ đi các query không có trong tập test qrels
+            # Trừ đi các query không có trong tập train qrels
             num_queries -= 1 
 
     # 5. Final Results
