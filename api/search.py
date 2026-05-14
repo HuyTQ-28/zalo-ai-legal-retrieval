@@ -76,13 +76,11 @@ def search_bm25(query: str, top_k: int = 10) -> list[dict]:
 
 def search_tfidf(query: str, top_k: int = 10) -> list[dict]:
     from api.loader import get_tfidf, get_corpus_raw
-    from luavt.preprocess import preprocess_to_string
 
     tfidf = get_tfidf()
     corpus_raw = get_corpus_raw()
 
-    processed_query = preprocess_to_string(query)
-    hits = tfidf.retrieve(processed_query, top_k=top_k)
+    hits = tfidf.retrieve(query, top_k=top_k)
 
     results = []
     for doc_id, score in hits:

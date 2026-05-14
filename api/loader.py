@@ -101,7 +101,7 @@ def get_tfidf():
     if _tfidf_engine is not None:
         return _tfidf_engine
 
-    from luavt.tfidf_retrieval import TFIDFRetriever
+    from luavt.engine import TFIDFRetriever
     from luavt.preprocess import load_corpus as tfidf_load_corpus
 
     CACHE_DIR.mkdir(exist_ok=True, parents=True)
