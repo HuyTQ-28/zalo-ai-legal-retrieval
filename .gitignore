@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Mở .gitignore, thêm vào cuối:
+data/
+.cache/
+*.tmp
+~$*

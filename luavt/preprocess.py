@@ -28,7 +28,7 @@ def load_corpus(corpus_path: str | Path, force_preprocess: bool = False) -> tupl
     records = load_jsonl(corpus_path)
     ids, token_lists = [], []
     for r in records:
-        ids.append(r["_id"])
+        ids.append(str(r.get("_id", r.get("id", ""))))
         combined = (r.get("title", "") + " " + r.get("text", "")).strip()
         token_lists.append(clean_text(combined))
 
@@ -53,7 +53,7 @@ def load_queries(queries_path: str | Path, force_preprocess: bool = False) -> tu
     records = load_jsonl(queries_path)
     ids, texts = [], []
     for r in records:
-        ids.append(r["_id"])
+        ids.append(str(r.get("_id", r.get("id", ""))))
         texts.append(r.get("text", ""))
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
