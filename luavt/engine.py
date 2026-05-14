@@ -11,9 +11,6 @@ from luavt.preprocess import load_corpus, load_queries, load_qrels
 from utils.preprocess import clean_text
 from utils.metrics import calculate_recall_at_k, calculate_mrr_at_k
 
-def simple_tokenize(text: str) -> List[str]:
-    return clean_text(text)
-
 class TFIDFRetriever:
     def __init__(self):
         self.corpus_ids: List[str] = []
@@ -24,15 +21,12 @@ class TFIDFRetriever:
         # inverse document frequency: {term: idf}
         self.idf: Dict[str, float] = {}
         
-        # inverted index: {term: {doc_idx: tf_idf_weight_normalized}}
+        # inverted index: {term: {doc_idx: tf_idf_weight}}
         self.inverted_index: Dict[str, Dict[int, float]] = defaultdict(dict)
         
         self.num_docs = 0
 
-    def _compute_tf(self, count: int) -> float:
-        return float(count)
-
-    def fit(self, corpus_ids: List[str], corpus_texts: List[str], cache_dir: Path | None = None) -> None:
+    def fit(self, corpus_ids: List[str], corpus_token_lists: List[List[str]], cache_dir: Path | None = None) -> None:
         """Xây dựng TF-IDF index từ corpus có hỗ trợ lưu cache."""
         cache_path = None
         if cache_dir:
@@ -50,12 +44,11 @@ class TFIDFRetriever:
 
         print("Fitting TF-IDF model from scratch...")
         self.corpus_ids = corpus_ids
-        self.num_docs = len(corpus_texts)
-        
+        self.num_docs = len(corpus_token_lists)
+
         # Bước 1: Tính TF cục bộ và DF cho mỗi từ
         doc_term_counts: List[Dict[str, int]] = []
-        for i, text in enumerate(corpus_texts):
-            tokens = simple_tokenize(text)
+        for tokens in corpus_token_lists:
             term_dict = defaultdict(int)
             for token in tokens:
                 term_dict[token] += 1
@@ -76,7 +69,7 @@ class TFIDFRetriever:
             for term, count in term_dict.items():
                 if term not in self.idf:
                     continue
-                tf_val = self._compute_tf(count) / doc_len
+                tf_val = count /doc_len
                 self.inverted_index[term][doc_idx] = tf_val * self.idf[term]
                     
         print(f"[TF-IDF from scratch] Index built: {self.num_docs:,} docs, {len(self.idf):,} terms")
@@ -93,7 +86,7 @@ class TFIDFRetriever:
 
     def retrieve(self, query_text: str, top_k: int = 100) -> List[Tuple[str, float]]:
         """Truy xuất tài liệu sử dụng Cosine Similarity qua Inverted Index."""
-        tokens = simple_tokenize(query_text)
+        tokens = clean_text(query_text)
         query_counts = defaultdict(int)
         for token in tokens:
             query_counts[token] += 1
@@ -103,7 +96,7 @@ class TFIDFRetriever:
         query_len = sum(query_counts.values())
         for term, count in query_counts.items():
             if term in self.idf:
-                tf_val = self._compute_tf(count) / query_len
+                tf_val = count /query_len
                 query_weights[term] = tf_val * self.idf[term]
 
         if not query_weights:
@@ -133,7 +126,7 @@ def run_evaluation(data_dir: str | Path = None, top_k: int = 100, qrels_split: s
     data_dir = Path(data_dir)
 
     print("Đang tải dữ liệu...")
-    corpus_ids, corpus_texts = load_corpus(data_dir / "corpus.jsonl")
+    corpus_ids, corpus_token_lists = load_corpus(data_dir / "corpus.jsonl")
     query_ids, query_texts = load_queries(data_dir / "queries.jsonl")
     qrels = load_qrels(data_dir / "qrels" / f"{qrels_split}.jsonl")
 
@@ -141,7 +134,7 @@ def run_evaluation(data_dir: str | Path = None, top_k: int = 100, qrels_split: s
     cache_dir.mkdir(exist_ok=True, parents=True)
 
     retriever = TFIDFRetriever()
-    retriever.fit(corpus_ids, corpus_texts, cache_dir=cache_dir)
+    retriever.fit(corpus_ids, corpus_token_lists, cache_dir=cache_dir)
 
     print("Đang truy vấn...")
     results = retriever.retrieve_batch(query_ids, query_texts, top_k=max(top_k, 100))

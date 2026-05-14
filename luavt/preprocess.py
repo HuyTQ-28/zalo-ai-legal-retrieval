@@ -14,10 +14,10 @@ def load_jsonl(path: str | Path) -> list[dict]:
     return records
 
 
-def load_corpus(corpus_path: str | Path, force_preprocess: bool = False) -> tuple[list[str], list[str]]:
-    """Trả về (ids, texts) đã tiền xử lý từ corpus.jsonl, có lưu cache."""
+def load_corpus(corpus_path: str | Path, force_preprocess: bool = False) -> tuple[list[str], list[list[str]]]:
+    """Trả về (ids, token_lists) đã tiền xử lý từ corpus.jsonl, có lưu cache."""
     corpus_path = Path(corpus_path)
-    cache_path = corpus_path.parent.parent / ".cache" / f"{corpus_path.stem}_processed.pkl"
+    cache_path = corpus_path.parent.parent / ".cache" / f"{corpus_path.stem}_tokens.pkl"
 
     if not force_preprocess and cache_path.exists():
         print(f"Loading corpus from cache: {cache_path}")
@@ -26,21 +26,21 @@ def load_corpus(corpus_path: str | Path, force_preprocess: bool = False) -> tupl
 
     print(f"Preprocessing corpus: {corpus_path}")
     records = load_jsonl(corpus_path)
-    ids, texts = [], []
+    ids, token_lists = [], []
     for r in records:
         ids.append(r["_id"])
         combined = (r.get("title", "") + " " + r.get("text", "")).strip()
-        texts.append(" ".join(clean_text(combined)))
+        token_lists.append(clean_text(combined))
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with open(cache_path, "wb") as f:
-        pickle.dump((ids, texts), f)
+        pickle.dump((ids, token_lists), f)
 
-    return ids, texts
+    return ids, token_lists
 
 
 def load_queries(queries_path: str | Path, force_preprocess: bool = False) -> tuple[list[str], list[str]]:
-    """Trả về (ids, texts) đã tiền xử lý từ queries.jsonl, có lưu cache."""
+    """Trả về (ids, texts) thô từ queries.jsonl để engine tự tokenize khi retrieve."""
     queries_path = Path(queries_path)
     cache_path = queries_path.parent.parent / ".cache" / f"{queries_path.stem}_processed.pkl"
 
@@ -54,7 +54,7 @@ def load_queries(queries_path: str | Path, force_preprocess: bool = False) -> tu
     ids, texts = [], []
     for r in records:
         ids.append(r["_id"])
-        texts.append(" ".join(clean_text(r.get("text", ""))))
+        texts.append(r.get("text", ""))
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with open(cache_path, "wb") as f:

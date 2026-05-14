@@ -105,10 +105,10 @@ def get_tfidf():
     from luavt.preprocess import load_corpus as tfidf_load_corpus
 
     CACHE_DIR.mkdir(exist_ok=True, parents=True)
-    corpus_ids, corpus_texts = tfidf_load_corpus(DATA_DIR / "corpus.jsonl")
+    corpus_ids, corpus_token_lists = tfidf_load_corpus(DATA_DIR / "corpus.jsonl")
 
     _tfidf_engine = TFIDFRetriever()
-    _tfidf_engine.fit(corpus_ids, corpus_texts, cache_dir=CACHE_DIR)
+    _tfidf_engine.fit(corpus_ids, corpus_token_lists, cache_dir=CACHE_DIR)
     return _tfidf_engine
 
 
